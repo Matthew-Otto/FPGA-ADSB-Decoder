@@ -10,6 +10,7 @@ module top (
 
     output logic probe,
 
+    output logic [7:0] so,
     output logic [5:0] led
 );
 
@@ -29,10 +30,6 @@ module top (
 
     logic [15:0] i2, q2;
     logic [15:0] mag2;
-    logic quant_sample;
-    logic quant_sample_ff;
-    logic quant_valid_ff;
-
 
     // move SDR samples to clk0 domain
     input_buffer input_buffer_i (
@@ -46,14 +43,12 @@ module top (
         .valid_out(sample_valid)
     );
 
+    assign so = i_samp;
+
     // convert samples to magnitude (^2)
     assign i2 = i_samp * i_samp;
     assign q2 = q_samp * q_samp;
     assign mag2 = i2 + q2;
-
-    // quantize samples:
-    assign quant_sample = |mag2[15:10];
-    flip_flop #(.WIDTH(16)) quant_ff (.clk(clk0), .d({sample_valid,quant_sample}), .q({quant_valid_ff,quant_sample_ff}));
 
     logic [7:0] decoded_byte;
     logic valid_decoded_byte;
@@ -61,10 +56,11 @@ module top (
     decode_adsb decode_i (
         .clk(clk0),
         .reset(reset),
-        .sample(quant_sample_ff),
-        .valid_sample(quant_valid_ff),
+        .sample(mag2),
+        .valid_sample(sample_valid),
         .byte_stream(decoded_byte),
-        .byte_stream_valid(valid_decoded_byte)
+        .byte_stream_valid(valid_decoded_byte),
+        .valid_cnt(led)
     );
 
     logic uart_ready;

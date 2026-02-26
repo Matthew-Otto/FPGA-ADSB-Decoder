@@ -17,10 +17,11 @@ def load_IQ_int8(filename):
     fs, data = wavfile.read(filename)
 
     #data = data[66672640:66748512]
-    data = data[66672640:]
+    data = data[74789500:74800000]
+    #data = data[567350:569000]
 
-    # convert to signed int8 and generate  complex samples
-    data_i8 = (data.astype(np.int16) - 128).astype(np.int8)
+    # convert to signed int8
+    data_i8 = (data ^ 0x80).view(np.int8)
     return data_i8
 
 
@@ -36,6 +37,7 @@ async def reset(clk, rst):
 async def test_decode(dut):
     # load adsb signal
     filepath = Path(__file__).resolve().parent.parent / "uint8_complex.wav"
+    #filepath = Path(__file__).resolve().parent.parent / "adsb-plna-lna32-vga40.wav"
     sample_data = load_IQ_int8(filepath)
 
     # system clock 100 MHz

@@ -2,103 +2,75 @@ module decode_adsb (
     input  logic clk,
     input  logic reset,
 
-    input  logic sample,
+    input  logic [15:0] sample,
     input  logic valid_sample,
 
     output logic [7:0] byte_stream,
-    output logic byte_stream_valid
+    output logic byte_stream_valid,
+
+    output logic [5:0] valid_cnt
 );
 
-    logic [15:0] search_window;
+    localparam int NOISE_WINDOW_SIZE = 64;
+    logic [15:0] search_window [15:0];
+    logic [15:0] thresh_search_window;
+    logic [15:0] noise_window [NOISE_WINDOW_SIZE-1:0];
+    logic [31:0] noise_sum;
+    logic [31:0] noise_level;
+    logic [31:0] threshold;
 
-    logic [3:0] sum_of_highs;
-    logic [3:0] sum_of_lows;
+    logic [20:0] sum_pulse;
+    logic [20:0] sum_space;
 
-    localparam int PREAMBLE_MATCH_THRESHOLD = 2;
+    localparam int PREAMBLE_MATCH_THRESHOLD = 3;
     logic preamble_match;
 
-    // shift valid bits in
+    // =================================================
+    // Shift valid samples in to preamble search window
+    // =================================================
     always_ff @(posedge clk) begin
         if (reset) begin
-            search_window <= '0;
+            for (int i = 0; i < 16; i++)
+                search_window[i] <= '0;
         end else if (valid_sample) begin
-            search_window <= {search_window, sample};
+            search_window[0] <= sample;
+            for (int i = 1; i < 16; i++)
+                search_window[i] <= search_window[i-1];
         end
     end
 
+    // Calculate noise levels from samples that came before current preamble search window
+    always_ff @(posedge clk) begin
+        if (reset) begin
+            for (int i = 0; i < NOISE_WINDOW_SIZE; i++)
+                noise_window[i] <= 0;
+        end else if (valid_sample) begin
+            noise_sum <= noise_sum + search_window[15] - noise_window[NOISE_WINDOW_SIZE-1];
+            noise_window[0] <= search_window[15];
+            for (int i = 1; i < NOISE_WINDOW_SIZE; i++)
+                noise_window[i] <= noise_window[i-1];
+        end
+    end
+
+    assign noise_level = noise_sum >> $clog2(NOISE_WINDOW_SIZE);
+    assign threshold = noise_level << 5;
+
+    // =========================
     // Find preamble
+    // =========================
     localparam logic [15:0] PREAMBLE = 16'b1010000101000000;
     always_comb begin
-        sum_of_highs = '0;
-        sum_of_lows = '0;
-        
-        for (int i = 0; i < 16; i++) begin
-            if (PREAMBLE[i])
-                sum_of_highs = sum_of_highs + search_window[i];
-            else
-                sum_of_lows = sum_of_lows + search_window[i];
-        end
+        for (int i = 0; i < 16; i++)
+            thresh_search_window[i] = search_window[i] > threshold;
     end
 
-    assign preamble_match = sum_of_highs > (sum_of_lows + PREAMBLE_MATCH_THRESHOLD);
-
-    // decode every sample pair
-    logic valid_packet_bit;
-    logic valid_decode;
-    logic decoded_bit;
-    logic [1:0] valid_decode_window;
-    logic [1:0] decode_window;
-
-    always_ff @(posedge clk) begin
-        if ((state == IDLE) || valid_decode) 
-            valid_decode_window <= 0;
-        else if (valid_sample) 
-            valid_decode_window <= {valid_decode_window[0],1'b1};
-
-        if (valid_sample) 
-            decode_window <= {decode_window[0],sample};
-    end
-
-    always_comb begin
-        case ({&valid_decode_window, decode_window})
-            3'b110 : begin
-                valid_decode = 1;
-                decoded_bit = 1;
-            end
-            3'b101 : begin
-                valid_decode = 1;
-                decoded_bit = 0;
-            end
-            default : begin
-                valid_decode = 0;
-                decoded_bit = 0;
-            end
-        endcase
-    end
-
-
-    // shift in decoded packet bits
-    logic [111:0] packet_buffer;
-
-    always_ff @(posedge clk) begin
-        if (valid_decode)
-            packet_buffer <= {packet_buffer, decoded_bit};
-    end
-
-    // CRC check
+    assign preamble_match = ~|(thresh_search_window ^ PREAMBLE);
+    
+    // =========================
+    // Process message
+    // =========================
     logic crc_error;
-
-    crc24 crc_i(
-        .clk,
-        .reset,
-        .valid(valid_decode),
-        .data(decoded_bit),
-        .crc_error
-    );
-
-    // Check complete packet and output decoded data
-    logic [7:0] shift_cnt, next_shift_cnt;
-    logic valid_packet;
+    logic clear_crc;
 
     enum {
         IDLE,
@@ -118,16 +90,18 @@ module decode_adsb (
         next_state = state;
         next_shift_cnt = shift_cnt;
         valid_packet = 0;
+        clear_crc = 0;
 
         case (state)
             IDLE : begin
+                clear_crc = 1;
                 if (preamble_match)
                     next_state = SHIFT;
             end
 
             SHIFT : begin
-                if (valid_decode) begin
-                    if (shift_cnt == 111)
+                if (valid_sample) begin
+                    if (shift_cnt == 224)
                         next_state = PACKET_CHECK;
                     else
                         next_shift_cnt = shift_cnt + 1;
@@ -142,6 +116,66 @@ module decode_adsb (
         endcase
     end
 
+    // =========================
+    // decode every sample pair
+    // =========================
+    logic valid_packet_bit;
+    logic valid_decode;
+    logic decoded_bit;
+    logic [1:0] valid_decode_window;
+    logic [15:0] decode_window [1:0];
+
+    always_ff @(posedge clk) begin
+        if ((state == IDLE) || valid_decode) 
+            valid_decode_window <= 0;
+        else if (valid_sample) 
+            valid_decode_window <= {valid_decode_window[0],1'b1};
+
+        if (valid_sample) 
+            decode_window <= {decode_window[0],sample};
+    end
+
+
+    always_comb begin
+        valid_decode = 0;
+        decoded_bit = 'x;
+
+        if (valid_decode_window[1]) begin
+            valid_decode = 1;
+            decoded_bit = decode_window[1] > decode_window[0];
+        end
+    end
+
+
+    // ================================
+    // shift in decoded packet bits
+    // ================================
+    logic [111:0] packet_buffer;
+
+    always_ff @(posedge clk) begin
+        if (valid_decode)
+            packet_buffer <= {packet_buffer, decoded_bit};
+    end
+
+    // =========================
+    // CRC check
+    // =========================
+    crc24 crc_i(
+        .clk,
+        .reset(clear_crc),
+        .valid(valid_decode),
+        .data(decoded_bit),
+        .crc_error
+    );
+
+    // =================================================
+    // Check complete packet and output decoded data
+    // =================================================
+    logic [7:0] shift_cnt, next_shift_cnt;
+    logic valid_packet;
+
+    
+
     logic [4:0] DF;
     logic [2:0] CA;
     logic [23:0] ICAO;
@@ -150,7 +184,9 @@ module decode_adsb (
     
     assign {DF,CA,ICAO,ME,PI} = packet_buffer;
 
+    // ===========================================
     // Buffer valid binary packet data in FIFO
+    // ===========================================
 
     logic packet_buffer_valid;
     logic packet_buffer_ready;
@@ -173,7 +209,9 @@ module decode_adsb (
     );
     
 
+    // =========================================================
     // Convert packet contents to ASCII and output from module
+    // =========================================================
 
     logic [3:0] idx, next_idx;
     logic [4:0] type_code;
@@ -268,5 +306,11 @@ module decode_adsb (
         .code_in(dec_sym),
         .ascii_out(decoded_code6)
     );
+
+
+    // DEBUG
+    always_ff @(posedge clk)
+        if (reset) valid_cnt <= 0;
+        else if (packet_buffer_ready) valid_cnt <= valid_cnt + 1;
 
 endmodule : decode_adsb
