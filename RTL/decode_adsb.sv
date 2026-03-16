@@ -50,7 +50,7 @@ module decode_adsb (
     end
 
     assign noise_level = noise_sum >> $clog2(NOISE_WINDOW_SIZE);
-    assign threshold = noise_level << 4;
+    assign threshold = noise_level << 3;
 
     // =========================
     // Find preamble

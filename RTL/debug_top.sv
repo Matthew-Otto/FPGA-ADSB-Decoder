@@ -67,6 +67,7 @@ module debug_top (
 
     logic sample_valid;
     logic signed [7:0] i_samp, q_samp;
+    logic [7:0] i_nodc, q_nodc;
 
     logic [15:0] mag2;
         
@@ -83,6 +84,28 @@ module debug_top (
     );
     // convert samples to magnitude (^2)
     assign mag2 = i_samp * i_samp + q_samp * q_samp;
+
+    // Remove DC component
+    dc_block #(
+        .WIDTH(8),
+        .K(10)
+    ) db_block_i (
+        .clk(clk0),
+        .reset(reset),
+        .sample_valid(sample_valid),
+        .sample_in(i_samp),
+        .sample_out(i_nodc)
+    );
+    dc_block #(
+        .WIDTH(8),
+        .K(10)
+    ) db_block_q (
+        .clk(clk0),
+        .reset(reset),
+        .sample_valid(sample_valid),
+        .sample_in(q_samp),
+        .sample_out(q_nodc)
+    );
 
     ///////////////////////////////////////////////////////////////////////
     //// DEBUG logic //////////////////////////////////////////////////////
@@ -170,7 +193,7 @@ module debug_top (
 
     always_ff @(posedge clk0) begin
         if (wr_en)
-            ram[cnt] <= {i_samp,q_samp};
+            ram[cnt] <= {i_nodc,q_nodc};
         
         {read_i,read_q} <= ram[cnt];
     end
@@ -196,8 +219,7 @@ module debug_top (
 
     uart_tx #(
         .CLK_RATE(100000000),
-        .BAUD_RATE(1000000),
-        .DOUBLE_STOP(1)
+        .BAUD_RATE(1000000)
     ) uart_tx_i (
         .clk(clk0),
         .reset(reset),

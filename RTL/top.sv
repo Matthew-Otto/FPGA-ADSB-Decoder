@@ -55,6 +55,7 @@ module top (
 
     logic sample_valid;
     logic [7:0] i_samp, q_samp;
+    logic [7:0] i_nodc, q_nodc;
     logic [7:0] i_abs, q_abs;
     logic [8:0] mag2;
         
@@ -70,10 +71,31 @@ module top (
         .valid_out(sample_valid)
     );
 
+    // Remove DC component
+    dc_block #(
+        .WIDTH(8),
+        .K(10)
+    ) db_block_i (
+        .clk(clk0),
+        .reset(reset),
+        .sample_valid(sample_valid),
+        .sample_in(i_samp),
+        .sample_out(i_nodc)
+    );
+    dc_block #(
+        .WIDTH(8),
+        .K(10)
+    ) db_block_q (
+        .clk(clk0),
+        .reset(reset),
+        .sample_valid(sample_valid),
+        .sample_in(q_samp),
+        .sample_out(q_nodc)
+    );
 
     // convert samples to magnitude mag = |i| + |q|
-    assign i_abs = (i_samp ^ {8{i_samp[7]}}) + i_samp[7];
-    assign q_abs = (q_samp ^ {8{q_samp[7]}}) + q_samp[7];
+    assign i_abs = (i_nodc ^ {8{i_nodc[7]}}) + i_nodc[7];
+    assign q_abs = (q_nodc ^ {8{q_nodc[7]}}) + q_nodc[7];
 
     assign mag2 = i_abs + q_abs;
 
