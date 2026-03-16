@@ -61,15 +61,10 @@ module async_fifo #(
         end
     end
 
-    always_ff @(negedge clk_in or posedge reset_in) begin
-        if (reset_in) r_ptr_g_sync1 <= '0;
-        else          r_ptr_g_sync1 <= r_ptr_g;
-    end
     always_ff @(posedge clk_in or posedge reset_in) begin
-        if (reset_in) r_ptr_g_sync2 <= '0;
-        else          r_ptr_g_sync2 <= r_ptr_g_sync1;
+        if (reset_in) {r_ptr_g_sync2,r_ptr_g_sync1} <= '0;
+        else          {r_ptr_g_sync2,r_ptr_g_sync1} <= {r_ptr_g_sync1,r_ptr_g};
     end
-
 
     //// read (clk_out) domain
     assign next_r_ptr_b = r_ptr_b + 1;
@@ -88,15 +83,10 @@ module async_fifo #(
         end
     end
 
-    always_ff @(negedge clk_out or posedge reset_out) begin
-        if (reset_out) w_ptr_g_sync1 <= '0;
-        else           w_ptr_g_sync1 <= w_ptr_g;
-    end
     always_ff @(posedge clk_out or posedge reset_out) begin
-        if (reset_out) w_ptr_g_sync2 <= '0;
-        else           w_ptr_g_sync2 <= w_ptr_g_sync1;
+        if (reset_out) {w_ptr_g_sync2,w_ptr_g_sync1} <= '0;
+        else           {w_ptr_g_sync2,w_ptr_g_sync1} <= {w_ptr_g_sync1,w_ptr_g};
     end
-
 
     dual_port_dual_clock_bram #(
         .ADDR_WIDTH(ADDR_WIDTH),

@@ -36,14 +36,14 @@ module adsb_6bit_to_ascii (
 
             6'd48: ascii_out = 8'h30;  // 0
             6'd49: ascii_out = 8'h31;  // 1
-            6'd51: ascii_out = 8'h32;  // 2
-            6'd52: ascii_out = 8'h33;  // 3
-            6'd53: ascii_out = 8'h34;  // 4
-            6'd54: ascii_out = 8'h35;  // 5
-            6'd55: ascii_out = 8'h36;  // 6
-            6'd56: ascii_out = 8'h37;  // 7
-            6'd57: ascii_out = 8'h38;  // 8
-            6'd58: ascii_out = 8'h39;  // 9
+            6'd50: ascii_out = 8'h32;  // 2
+            6'd51: ascii_out = 8'h33;  // 3
+            6'd52: ascii_out = 8'h34;  // 4
+            6'd53: ascii_out = 8'h35;  // 5
+            6'd54: ascii_out = 8'h36;  // 6
+            6'd55: ascii_out = 8'h37;  // 7
+            6'd56: ascii_out = 8'h38;  // 8
+            6'd57: ascii_out = 8'h39;  // 9
 
             default: ascii_out = 8'h00;
         endcase

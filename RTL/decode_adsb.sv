@@ -5,10 +5,10 @@ module decode_adsb (
     input  logic [15:0] sample,
     input  logic valid_sample,
 
-    output logic [7:0] byte_stream,
-    output logic byte_stream_valid,
+    output logic valid_packet,
 
-    output logic [5:0] valid_cnt
+    output logic [7:0] byte_stream,
+    output logic byte_stream_valid
 );
 
     localparam int NOISE_WINDOW_SIZE = 64;
@@ -40,6 +40,7 @@ module decode_adsb (
         if (reset) begin
             for (int i = 0; i < NOISE_WINDOW_SIZE; i++)
                 noise_window[i] <= 0;
+            noise_sum <= '0;
         end else if (valid_sample) begin
             noise_sum <= noise_sum + search_window[15] - noise_window[NOISE_WINDOW_SIZE-1];
             noise_window[0] <= search_window[15];
@@ -49,7 +50,7 @@ module decode_adsb (
     end
 
     assign noise_level = noise_sum >> $clog2(NOISE_WINDOW_SIZE);
-    assign threshold = noise_level << 5;
+    assign threshold = noise_level << 4;
 
     // =========================
     // Find preamble
@@ -67,6 +68,7 @@ module decode_adsb (
     // =========================
     logic crc_error;
     logic clear_crc;
+    logic [7:0] shift_cnt, next_shift_cnt;
 
     enum {
         IDLE,
@@ -115,7 +117,6 @@ module decode_adsb (
     // =========================
     // decode every sample pair
     // =========================
-    logic valid_packet_bit;
     logic valid_decode;
     logic decoded_bit;
     logic [1:0] valid_decode_window;
@@ -169,9 +170,6 @@ module decode_adsb (
     // =================================================
     // Check complete packet and output decoded data
     // =================================================
-    logic [7:0] shift_cnt, next_shift_cnt;
-    logic valid_packet;
-
     
 
     logic [4:0] DF;
@@ -233,6 +231,7 @@ module decode_adsb (
         DECODE_IDLE,
         DECODE_ICAO,
         DECODE_ME,
+        DECODE_SPACE,
         DECODE_DONE
     } decode_state, next_decode_state;
 
@@ -269,8 +268,7 @@ module decode_adsb (
                 if (idx == 5) begin
                     case (type_code)
                         4'd1,4'd2,4'd3,4'd4 : begin
-                            next_decode_state = DECODE_ME;
-                            next_idx = 0;
+                            next_decode_state = DECODE_SPACE;
                         end
 
                         default : next_decode_state = DECODE_DONE;
@@ -288,9 +286,24 @@ module decode_adsb (
                     next_decode_state = DECODE_DONE;
             end
 
+            DECODE_SPACE : begin
+                byte_stream_valid = 1;
+                byte_stream = 8'h20; // newline
+                next_decode_state = DECODE_ME;
+                next_idx = 0;
+            end
+
             DECODE_DONE : begin
-                packet_buffer_ready = 1;
-                next_decode_state = DECODE_IDLE;
+                next_idx = 0;
+                byte_stream_valid = 1;
+
+                if (idx == 0) begin
+                    byte_stream = 8'h0A; // newline
+                    packet_buffer_ready = 1;
+                    next_decode_state = DECODE_IDLE;
+                end else begin
+                    byte_stream = 8'h0D; // carriage return
+                end
             end
         endcase
     end
@@ -304,11 +317,5 @@ module decode_adsb (
         .code_in(dec_sym),
         .ascii_out(decoded_code6)
     );
-
-
-    // DEBUG
-    always_ff @(posedge clk)
-        if (reset) valid_cnt <= 0;
-        else if (packet_buffer_ready) valid_cnt <= valid_cnt + 1;
 
 endmodule : decode_adsb

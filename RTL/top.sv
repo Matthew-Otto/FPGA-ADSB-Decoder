@@ -1,6 +1,8 @@
 module top (
     input  logic       clk0,
+    input  logic       clk2,
     input  logic       btn1,
+    input  logic       btn2,
 
     output logic       uart_tx,
 
@@ -10,9 +12,31 @@ module top (
 
     output logic probe,
 
-    output logic [7:0] so,
     output logic [5:0] led
 );
+
+    /////////////////////////////////
+    //// user IO ////////////////////
+    /////////////////////////////////
+
+    logic btn1_db;
+
+    debounce #(
+        .CLK_FREQ(100000000),
+        .PULSE(1)
+    ) db_1 (
+        .clk(clk0),
+        .db_in(btn1),
+        .db_out(btn1_db)
+    );
+    /////////////////////////////////
+    //// end user IO ////////////////
+    /////////////////////////////////
+
+
+    /////////////////////////////////
+    //// reset //////////////////////
+    /////////////////////////////////
 
     logic reseti;
     logic reset;
@@ -22,15 +46,18 @@ module top (
         .rst(reseti)
     );
 
-    assign reset = btn1 | reseti;
+    assign reset = btn1_db | reseti;
+
+    /////////////////////////////////
+    //// end reset //////////////////
+    /////////////////////////////////
 
 
     logic sample_valid;
-    logic signed [7:0] i_samp, q_samp;
-
-    logic [15:0] i2, q2;
-    logic [15:0] mag2;
-
+    logic [7:0] i_samp, q_samp;
+    logic [7:0] i_abs, q_abs;
+    logic [8:0] mag2;
+        
     // move SDR samples to clk0 domain
     input_buffer input_buffer_i (
         .core_clk(clk0),
@@ -43,24 +70,40 @@ module top (
         .valid_out(sample_valid)
     );
 
-    assign so = i_samp;
 
-    // convert samples to magnitude (^2)
-    assign i2 = i_samp * i_samp;
-    assign q2 = q_samp * q_samp;
-    assign mag2 = i2 + q2;
+    // convert samples to magnitude mag = |i| + |q|
+    assign i_abs = (i_samp ^ {8{i_samp[7]}}) + i_samp[7];
+    assign q_abs = (q_samp ^ {8{q_samp[7]}}) + q_samp[7];
+
+    assign mag2 = i_abs + q_abs;
+
+    logic [8:0] decimated_sample;
+    logic decimate_valid;
+
+    decimate #(
+        .FACTOR(4),
+        .DATA_WIDTH(9)
+    ) decimate_i (
+        .clk(clk0),
+        .reset(reset),
+        .sample_in(mag2),
+        .sample_in_valid(sample_valid),
+        .sample_out(decimated_sample),
+        .sample_out_valid(decimate_valid)
+    );
 
     logic [7:0] decoded_byte;
     logic valid_decoded_byte;
+    logic valid_packet;
 
     decode_adsb decode_i (
         .clk(clk0),
         .reset(reset),
-        .sample(mag2),
-        .valid_sample(sample_valid),
+        .sample(decimated_sample),
+        .valid_sample(decimate_valid),
+        .valid_packet(valid_packet),
         .byte_stream(decoded_byte),
-        .byte_stream_valid(valid_decoded_byte),
-        .valid_cnt(led)
+        .byte_stream_valid(valid_decoded_byte)
     );
 
     logic uart_ready;
@@ -89,7 +132,7 @@ module top (
 
     uart_tx #(
         .CLK_RATE(100000000),
-        .BAUD_RATE(115200)
+        .BAUD_RATE(1000000)
     ) uart_tx_i (
         .clk(clk0),
         .reset(reset),
@@ -98,5 +141,18 @@ module top (
         .valid(uart_valid),
         .data(uart_byte)
     );
+
+    /////////////////////////////////
+    //// Valid Packet Counter ///////
+    /////////////////////////////////
+    logic [5:0] led_cnt;
+    always_ff @(posedge clk0) begin
+        if (reset)
+            led_cnt <= 0;
+        else if (valid_packet)
+            led_cnt <= led_cnt + 1;
+    end
+
+    assign led = ~led_cnt;
 
 endmodule

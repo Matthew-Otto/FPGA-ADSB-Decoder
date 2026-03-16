@@ -79,18 +79,18 @@ IO_PORT "uart_rx" IO_TYPE=LVCMOS33;
 // ==============================================
 // SDR samples
 // ==============================================
-IO_LOC  "samp_clk" 31;
+IO_LOC  "samp_clk" 77;
 IO_PORT "samp_clk" IO_TYPE=LVCMOS33 PULL_MODE=UP;
 
-IO_LOC  "i[7]" 52;
+IO_LOC  "i[7]" 26;
 IO_PORT "i[7]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "q[7]" 53;
+IO_LOC  "q[7]" 29;
 IO_PORT "q[7]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "i[6]" 71;
+IO_LOC  "i[6]" 30;
 IO_PORT "i[6]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "q[6]" 72;
+IO_LOC  "q[6]" 31;
 IO_PORT "q[6]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "i[5]" 79;
+IO_LOC  "i[5]" 72;
 IO_PORT "i[5]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
 IO_LOC  "q[5]" 86;
 IO_PORT "q[5]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
@@ -120,22 +120,3 @@ IO_PORT "q[0]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
 # debug
 IO_LOC  "probe" 73;
 IO_PORT "probe" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-
-
-IO_LOC  "so[0]" 74;
-IO_PORT "so[0]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "so[1]" 75;
-IO_PORT "so[1]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "so[2]" 85;
-IO_PORT "so[2]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "so[3]" 77;
-IO_PORT "so[3]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "so[4]" 27;
-IO_PORT "so[4]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "so[5]" 28;
-IO_PORT "so[5]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "so[6]" 25;
-IO_PORT "so[6]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-IO_LOC  "so[7]" 26;
-IO_PORT "so[7]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-
