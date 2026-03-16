@@ -88,7 +88,7 @@ module debug_top (
     // Remove DC component
     dc_block #(
         .WIDTH(8),
-        .K(10)
+        .K(18)
     ) db_block_i (
         .clk(clk0),
         .reset(reset),
@@ -98,7 +98,7 @@ module debug_top (
     );
     dc_block #(
         .WIDTH(8),
-        .K(10)
+        .K(18)
     ) db_block_q (
         .clk(clk0),
         .reset(reset),

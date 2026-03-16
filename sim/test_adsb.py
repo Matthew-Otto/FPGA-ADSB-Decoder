@@ -3,7 +3,6 @@
 import os
 from pathlib import Path
 import numpy as np
-from scipy.io import wavfile
 
 import cocotb
 from cocotb_tools.runner import get_runner
@@ -14,15 +13,10 @@ from cocotbext.axi import AxiLiteWriteBus, AxiLiteReadBus, AxiLiteRamRead, AxiLi
 
 
 def load_IQ_int8(filename):
-    fs, data = wavfile.read(filename)
-
-    #data = data[66672640:66748512]
-    data = data[74789500:74800000]
-    #data = data[567350:569000]
-
-    # convert to signed int8
-    data_i8 = (data ^ 0x80).view(np.int8)
-    return data_i8
+    data = np.fromfile(filename, dtype=np.int8, count=8000000)
+    i = data[0::2]
+    q = data[1::2]
+    return zip(i, q)
 
 
 async def reset(clk, rst):
@@ -36,22 +30,24 @@ async def reset(clk, rst):
 @cocotb.test()
 async def test_decode(dut):
     # load adsb signal
-    filepath = Path(__file__).resolve().parent.parent / "uint8_complex.wav"
-    #filepath = Path(__file__).resolve().parent.parent / "adsb-plna-lna32-vga40.wav"
+    filepath = Path(__file__).resolve().parent.parent / "test_samples.bin"
     sample_data = load_IQ_int8(filepath)
 
     # system clock 100 MHz
     cocotb.start_soon(Clock(dut.clk0, 10, unit="ns").start())
-    # sample clock 2 Mhz
-    cocotb.start_soon(Clock(dut.samp_clk, 500, unit="ns").start())
+    # sample clock 8 Mhz
+    cocotb.start_soon(Clock(dut.samp_clk, 125, unit="ns").start())
     await reset(dut.clk0, dut.reset)
 
 
-    # pass samples @ 2 MHz
+    # pass samples @ 8 MHz
     for i, q in sample_data:
         dut.i.value = int(i)
         dut.q.value = int(q)
         await RisingEdge(dut.samp_clk)
+
+    await ClockCycles(dut.samp_clk, 100)
+
 
 
 def test_runner():
@@ -71,7 +67,6 @@ def test_runner():
             "-Wno-WIDTH",
             "--trace-fst",
             "--trace-structs",
-            #"--threads", "4"
         ]
     )
 

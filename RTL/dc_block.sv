@@ -17,7 +17,7 @@ module dc_block #(
     logic signed [WIDTH-1:0] dc;
     logic signed [WIDTH+K-1:0] dc_ext;
 
-    assign dc = dc_ext >>> K;
+    assign dc = dc_ext[WIDTH+K-1:K];
     assign sample_out = sample_in - dc;
 
     always_ff @(posedge clk) begin
