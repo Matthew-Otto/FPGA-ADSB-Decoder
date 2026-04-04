@@ -17,6 +17,7 @@ Decoded aircraft telemetry being streamed in real-time.
 This project is built entirely using open-source FPGA dev tools.
 
 * [Python](https://www.python.org/) - Various scripts and tooling
+* [Numpy](https://numpy.org/install/) - To process the samples used for simulation.
 * [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build) - Complete FPGA build flow
 * [cocotb](https://www.cocotb.org/) - Testbench generator
 * [Verilator](https://www.verilator.org/) - Simulation (driven by cocotb)
